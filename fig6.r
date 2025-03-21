@@ -239,3 +239,4 @@ p_6f <- cowplot::plot_grid(diameter, ident_pro, intensity, clta, cltc, hp1bp3, n
 
 p_6f
 
+p_6f

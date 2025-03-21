@@ -212,3 +212,5 @@ p1 <- SankeyPlot(df, x = c(".", "Phagocytosis Content"),
     stratum = "celltype_without_phago_genes",  links_fill_by = "Cell Type", xlab = NULL)
 
 p1
+
+p1
