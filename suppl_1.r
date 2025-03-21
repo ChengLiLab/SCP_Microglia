@@ -1,3 +1,10 @@
+#####################################################################################
+## Project: SCP_Microglia                                                          ##
+## Script Purpose: Supplementary Figures 1                                         ##
+## Data: 2025.03.21                                                                ##
+## Author: Guangxin Zhang, Haoran Zhang                                            ##
+#####################################################################################
+
 library(tidyverse)
 library(ggplot2)
 library(iq)
