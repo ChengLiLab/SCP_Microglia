@@ -1,3 +1,11 @@
+#####################################################################################
+## Project: SCP_Microglia                                                          ##
+## Script Purpose: Main Figure                                                     ##
+## Data: 2025.03.21                                                                ##
+## Author: Guangxin Zhang, Haoran Zhang                                            ##
+#####################################################################################
+
+
 library(tidyverse)
 library(ggplot2)
 library(iq)
@@ -238,4 +246,3 @@ ident_pro <- scplotter::FeatureStatPlot(seurat_obj, features = c("nFeature_SCP")
 p_6f <- cowplot::plot_grid(diameter, ident_pro, intensity, clta, cltc, hp1bp3, ncol = 3)
 
 p_6f
-
