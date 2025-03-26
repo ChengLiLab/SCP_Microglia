@@ -330,53 +330,57 @@ p_cor <- ComplexHeatmap::pheatmap(c,
 
 
 # 6.Protein-to-mRNA abundance plot -----------------------------------------------------------------------------------
-filtered_mdata <- rna1_seu@meta.data[rna1_seu@meta.data$Age %in% c("P30", "P100", "P540") & rna1_seu@meta.data$Sex == "Male", ]  
-rna1_data_filter <- matrix_list[[1]][, colnames(matrix_list[[1]]) %in% rownames(filtered_mdata), drop = FALSE]  
+rna1_seu_age <- rna1_seu %>% 
+  subset(Age %in% c("P30", "P100", "P540")) %>%  
+  subset(Sex == "Male")
+rna1_seu_age <- rna1_seu_age[rowSums(rna1_seu_age@assays$RNA@counts) > 0, ] 
+rna1_count <- as.data.frame(GetAssayData(rna1_seu_age, layer = "counts"))
 
-common_genes <- intersect(rownames(matrix_list[[4]]), rownames(rna1_data_filter))  
-scp_data_common <- matrix_list[[4]][common_genes, , drop = FALSE]
-rna1_data_common <- rna1_data_filter[common_genes, , drop = FALSE]
+common_genes <- intersect(rownames(scp_count), rownames(rna1_count))
+scp_common <- scp_count[common_genes, ]
+rna1_common <- rna1_count[common_genes, ]
+identical(rownames(scp_common), rownames(rna1_common))
+seurat_obj <- CreateSeuratObject(counts = cbind(scp_common, rna1_common))
 
-average_expr_scp <- data.frame(Protein = rownames(scp_data_common),   
-                               MeanExpression = rowMeans(scp_data_common))
-average_expr_rna <- data.frame(Gene = rownames(rna1_data_common),   
-                               MeanExpression = rowMeans(rna1_data_common))
+data_types <- c(rep("SCP", ncol(scp_common)), rep("RNA", ncol(rna1_common)))  
+seurat_obj <- AddMetaData(seurat_obj, metadata = data_types, col.name = "type")  
+head(seurat_obj@meta.data) 
 
-merged_cor <- left_join(average_expr_scp, 
-                        average_expr_rna,
-                        by = c("Protein" = "Gene"),
-                        suffix = c(".protein", ".rna"))
+seurat_obj <- NormalizeData(seurat_obj)
 
-correlation <- cor(merged_cor$MeanExpression.protein, 
-                   merged_cor$MeanExpression.rna, 
+exp_data <- as.data.frame(AverageExpression(seurat_obj, group.by = c("type"), slot = "data"))
+head(exp_data)  
+colnames(exp_data) <- c("RNA","SCP")
+
+correlation <- cor(exp_data$RNA, 
+                   exp_data$SCP, 
                    method = "spearman")  
 
 #### Calculate fold change and p-value
-rna1_data_common <- as.matrix(rna1_data_common)
-scp_data_common <- as.matrix(scp_data_common)
-set.seed(123) 
-result_fc <- merged_cor %>%
+rna1_common <- as.matrix(rna1_common)
+scp_common <- as.matrix(scp_common)
+result_fc <- exp_data %>%
   mutate(
-    fold_change = exp(MeanExpression.rna - MeanExpression.protein),  
-    log2_fold_change = log2(fold_change), 
-    p_value = sapply(1:nrow(scp_data_common), function(i) {
-      n_samples <- min(ncol(rna1_data_common), ncol(scp_data_common))
-      rna_sample <- sample(rna1_data_common[i, ], n_samples, replace = FALSE)
-      protein_sample <- sample(scp_data_common[i, ], n_samples, replace = FALSE)
-      
-      wilcox.test(rna_sample, protein_sample)$p.value
+    fold_change = (RNA+1)/(SCP+1),  
+    log2_fold_change = log2(fold_change),
+    p_value = sapply(1:nrow(scp_common), function(i) {
+      wilcox.test(rna1_common[i, ], scp_common[i, ])$p.value
     }),
     p_adj = p.adjust(p_value, method = "fdr")
   ) 
 
 plot <- result_fc %>%
   mutate(significance = case_when(
-    p_adj < 0.05 & log2_fold_change >= 2 ~ "Lower in protein",
-    p_adj < 0.05 & log2_fold_change <= -2 ~ "Higher in protein",
+    p_adj < 0.05 & 
+      log2_fold_change > 2 ~ "Lower in protein",
+    p_adj < 0.05 & 
+      log2_fold_change < -2 ~ "Higher in protein",
     TRUE ~ "NoSig"
   ))
+table(plot$significance)
+plot$Protein <- rownames(plot)
 
-p_cor <- ggplot(plot, aes(x = MeanExpression.rna, y = MeanExpression.protein)) +
+p_cor1 <- ggplot(plot, aes(x = log(RNA+1), y = log(SCP+1))) +
   geom_point(aes(color = significance), size = 1, alpha=0.5) +
   scale_color_manual(values = c("Higher in protein" = "#d35230",
                                 "Lower in protein" = "#2b7cd3",
@@ -385,14 +389,14 @@ p_cor <- ggplot(plot, aes(x = MeanExpression.rna, y = MeanExpression.protein)) +
                            aes(label = Protein),
                            size = 3,
                            box.padding = 0.5, 
-                           point.padding = 0.8,
+                           point.padding = 0.8, 
                            min.segment.length = 0.5,
-                           segment.color = "black", 
+                           segment.color = "black",
                            show.legend = F) +
   ggpubr::stat_cor(method="spearman", label.x = 4) +
-  geom_abline(intercept = c(-log(4), 0, log(4)), slope = 1, 
+  geom_abline(intercept = c(-log(4), 0, log(4)), slope = 1,  
               linetype = c("dotted", "dashed", "dotted"),
-              color = c("gray", "black", "gray") ,linewidth = 0.5) + 
+              color = c("gray", "black", "gray") ,linewidth = 0.5) +  
   scale_x_continuous(limits = c(0,6.6)) +
   scale_y_continuous(limits = c(0,6.6)) +
   labs(x = "Mean log normalized mRNA expression", 
@@ -402,7 +406,8 @@ p_cor <- ggplot(plot, aes(x = MeanExpression.rna, y = MeanExpression.protein)) +
 
 
 # 7.GO enrichment -----------------------------------------------------------------------------------
-go_analysis_high_rna <- enrichGO(gene = subset(plot,significance=="Lower in protein")[,1],
+gene1 <- rownames(subset(plot,significance=="Lower in protein"))
+go_analysis_high_rna <- enrichGO(gene1,
                                  OrgDb = org.Mm.eg.db,
                                  keyType = "SYMBOL",
                                  ont = "BP",
@@ -412,7 +417,8 @@ go_analysis_high_rna <- enrichGO(gene = subset(plot,significance=="Lower in prot
                                  readable = TRUE)
 go.rna <- simplify(go_analysis_high_rna,cutoff=0.7,by="p.adjust",select_fun=min)  
 
-go_analysis_high_protein <- enrichGO(gene = subset(plot,significance=="Higher in protein")[,1],
+gene2 <- rownames(subset(plot,significance=="Higher in protein"))
+go_analysis_high_protein <- enrichGO(gene2,
                                      OrgDb = org.Mm.eg.db,
                                      keyType = "SYMBOL",
                                      ont = "BP",
@@ -421,7 +427,7 @@ go_analysis_high_protein <- enrichGO(gene = subset(plot,significance=="Higher in
                                      qvalueCutoff = 0.05,
                                      readable = TRUE)
 
-go.protein <- simplify(go_analysis_high_protein,cutoff=0.7,by="p.adjust",select_fun=min) 
+go.protein <- simplify(go_analysis_high_protein,cutoff=0.7,by="p.adjust",select_fun=min)  
 
 go_1 <- go.protein@result %>%
   dplyr::select(c("Description","Count","p.adjust")) %>%
@@ -445,6 +451,7 @@ plot.data <- rbind(go_1,go_2) %>%
          hjust = ifelse(type == 1, 1, 0)) %>%
   arrange(x) %>%
   mutate(Description = factor(Description, levels = Description))
+
 
 p_go <- ggplot(plot.data,aes(x, Description, colour = class)) +
   geom_segment(aes(xend = 0, yend = Description), linewidth = 1,
@@ -479,6 +486,39 @@ p_go <- ggplot(plot.data,aes(x, Description, colour = class)) +
 
 
 # 8.Correlation Analysis of different cell-type scRNA-seq-----------------------------------------------------------------------------------
+# filter for 2M/3M-age cells
+scp_seu_2m <- scp_seu %>%
+  subset(age == "2M")
+scp_count_2m <- as.data.frame(GetAssayData(scp_seu_2m, layer = "counts"))
+scp_count_2m <- scp_count_2m[rowSums(scp_count_2m) > 0, ]
+
+rna1_seu_3m <- rna1_seu %>%
+  subset(Age == "P100" & Sex == "Male") 
+rna1_count_3m <- as.data.frame(GetAssayData(rna1_seu_3m, layer = "counts"))
+rna1_count_3m <- rna1_count_3m[rowSums(rna1_count_3m) > 0, ]
+
+common_genes <- intersect(rownames(scp_count_2m), rownames(rna1_count_3m))
+scp_common_2m <- scp_count_2m[common_genes, ]
+rna1_common_3m <- rna1_count_3m[common_genes, ]
+identical(rownames(scp_common_2m ), rownames(rna1_common_3m))
+seurat_obj <- CreateSeuratObject(counts = cbind(scp_common_2m, rna1_common_3m))
+
+data_types <- c(rep("SCP", ncol(scp_common_2m)), rep("RNA", ncol(rna1_common_3m)))  
+seurat_obj <- AddMetaData(seurat_obj, metadata = data_types, col.name = "type")  
+head(seurat_obj@meta.data) 
+
+seurat_obj <- NormalizeData(seurat_obj)
+
+exp_data <- as.data.frame(AverageExpression(seurat_obj, group.by = c("type"), slot = "data"))
+head(exp_data)  
+colnames(exp_data) <- c("RNA","SCP")
+
+correlation <- cor(exp_data$RNA, 
+                   exp_data$SCP, 
+                   method = "spearman")  
+
+
+## Different cell-type scRNA-seq samples
 mm_rna_data <- readRDS("data/scRNA-seq/Tabula_Muris_Senis/mm.rds")
 table(mm_rna_data@meta.data$age,mm_rna_data@meta.data$sex)
 
@@ -498,54 +538,45 @@ selected_cell_type <- c("fibroblast",
                         "bladder cell",
                         "bladder urothelial cell") 
 mm_rna <- subset(mm_rna1, cell_type %in% selected_cell_type) 
+mm_rna_count_3m <- as.data.frame(GetAssayData(mm_rna, layer = "counts"))
+mm_rna_count_3m <- mm_rna_count_3m[rowSums(mm_rna_count_3m) > 0, ]
 
-scp_seu_2m <- scp_seu %>%
-  subset(age == "2M")
-rna_3m <- rna1_seu %>%
-  subset(Age == "P100" & Sex == "Male") 
+name <- bitr(rownames(mm_rna_count_3m),fromType = "ENSEMBL",toType = "SYMBOL",OrgDb = "org.Mm.eg.db")
+common_genes <- intersect(rownames(scp_count_2m), name$SYMBOL)
 
-# Correlation calculation 
-df <- as.data.frame(GetAssayData(scp_seu_2m, layer = "data"))  
-average_expr_scp_2m <- data.frame(Protein = rownames(df),   
-                                  MeanExpression = rowMeans(df))
-average_expr_rna_3m <- data.frame(Gene = rownames(GetAssayData(rna_3m, layer = "data")),   
-                                  MeanExpression = rowMeans(GetAssayData(rna_3m, layer = "data")))  
-common_genes <- intersect(rownames(average_expr_scp_2m), rownames(average_expr_rna_3m))  
-average_expr1_filtered <- average_expr_scp_2m[common_genes, , drop = FALSE]  
-average_expr2_filtered <- average_expr_rna_3m[common_genes, , drop = FALSE]  
-merged_cor <- left_join(average_expr1_filtered, 
-                        average_expr2_filtered,
-                        by = c("Protein" = "Gene"),
-                        suffix = c(".protein", ".rna"))
-correlation_3m <- cor(merged_cor$MeanExpression.protein, 
-                      merged_cor$MeanExpression.rna, 
-                      method = "spearman")  
+scp_common_2m <- scp_count_2m[common_genes, ]
+mm_rna_common_3m <- mm_rna_count_3m[name$ENSEMBL[name$SYMBOL %in% common_genes], ]
 
+seurat_obj <- CreateSeuratObject(counts = cbind(scp_common_2m, mm_rna_common_3m))
+
+original_metadata <- mm_rna_data@meta.data  
+new_cell_names <- colnames(seurat_obj) 
+matched_metadata <- original_metadata[new_cell_names, , drop = FALSE]  
+new_seurat_object <- AddMetaData(object = seurat_obj,   
+                                 metadata = matched_metadata,
+                                 col.name = "cell_type")  
+head(new_seurat_object@meta.data) 
+new_seurat_object@meta.data$cell_type <- as.character(new_seurat_object@meta.data$cell_type)  
+new_seurat_object@meta.data$cell_type[is.na(new_seurat_object@meta.data$cell_type)] <- "SCP"  
+
+seurat_obj <- NormalizeData(new_seurat_object)
+
+exp_data <- as.data.frame(AverageExpression(seurat_obj, group.by = c("cell_type"), slot = "data"))
+colnames(exp_data) <- gsub("RNA.", "", colnames(exp_data), fixed = TRUE)  
+
+# Correlation calculation
+selected_cell_type <- colnames(exp_data)[-13]
 correlation_results <- numeric(length(selected_cell_type))  
 for (t in 1:length(selected_cell_type)){
-  rna_t <- subset(mm_rna, cell_type == selected_cell_type[t])
-  expr_rna <- GetAssayData(rna_t, layer = "data")
-  average_expr_rna <- data.frame(Gene = rownames(expr_rna),   
-                                 MeanExpression = rowMeans(expr_rna)) 
-  name <- bitr(average_expr_rna$Gene,fromType = "ENSEMBL",toType = "SYMBOL",OrgDb = "org.Mm.eg.db")
-  average_expr_rna <- inner_join(name,average_expr_rna,by=c("ENSEMBL"="Gene")) 
-  
-  common_genes <- intersect(rownames(average_expr_scp), average_expr_rna$SYMBOL)  
-  average_expr1_filtered <- average_expr_scp[common_genes, , drop = FALSE]  
-  
-  merged_cor <- left_join(average_expr1_filtered, 
-                          average_expr_rna[,2:3],
-                          by = c("Protein" = "SYMBOL"),
-                          suffix = c(".protein", ".rna"))
-  
-  correlation_results[t] <- cor(merged_cor$MeanExpression.protein,
-                                merged_cor$MeanExpression.rna, 
+  correlation_results[t] <- cor(exp_data[,t][exp_data[,t] != 0],
+                                exp_data[,13][exp_data[,t] != 0], 
                                 method = "spearman")  
 }
 correlation_df <- data.frame(cell_type = c("Microglia",selected_cell_type), 
-                             correlation = c(correlation_3m,correlation_results))%>%  
+                             correlation = c(correlation,correlation_results)) %>%  
   mutate(cell_type = recode(cell_type,  
-                            "basal epithelial cell of tracheobronchial tree" = "basal epithelial cell")) %>%
+                            "basal.epithelial.cell.of.tracheobronchial.tree" = "basal.epithelial.cell")) %>%  
+  mutate(cell_type = gsub("\\.", " ", cell_type)) %>%
   mutate(cell_type = factor(cell_type,levels = c("Microglia",
                                                  "fibroblast",
                                                  "mesenchymal stem cell", 
@@ -569,12 +600,6 @@ p_cor <- ggplot(correlation_df,aes(x=reorder(cell_type,-correlation),
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         axis.ticks.length = unit(0.1,'cm')) +
   guides(fill = "none") +
-  scale_y_continuous(expand = c(0,0),limits = c(0,0.5)) +
-  xlab("Cell Type")
-
-
-
-
-
-
-
+  scale_y_continuous(expand = c(0,0),limits = c(-0.1,0.5)) +
+  xlab("Cell Type") +
+  ylab("Spearman' correlation")
