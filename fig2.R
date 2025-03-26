@@ -543,9 +543,10 @@ mm_rna_count_3m <- mm_rna_count_3m[rowSums(mm_rna_count_3m) > 0, ]
 
 name <- bitr(rownames(mm_rna_count_3m),fromType = "ENSEMBL",toType = "SYMBOL",OrgDb = "org.Mm.eg.db")
 common_genes <- intersect(rownames(scp_count_2m), name$SYMBOL)
-
+name <- name[name$SYMBOL %in% common_genes, ]
+name <- name[match(common_genes, name$SYMBOL), ]
+mm_rna_common_3m <- mm_rna_count_3m[name$ENSEMBL, ]
 scp_common_2m <- scp_count_2m[common_genes, ]
-mm_rna_common_3m <- mm_rna_count_3m[name$ENSEMBL[name$SYMBOL %in% common_genes], ]
 
 seurat_obj <- CreateSeuratObject(counts = cbind(scp_common_2m, mm_rna_common_3m))
 
@@ -568,8 +569,8 @@ colnames(exp_data) <- gsub("RNA.", "", colnames(exp_data), fixed = TRUE)
 selected_cell_type <- colnames(exp_data)[-13]
 correlation_results <- numeric(length(selected_cell_type))  
 for (t in 1:length(selected_cell_type)){
-  correlation_results[t] <- cor(exp_data[,t][exp_data[,t] != 0],
-                                exp_data[,13][exp_data[,t] != 0], 
+  correlation_results[t] <- cor(exp_data[,t],
+                                exp_data[,13], 
                                 method = "spearman")  
 }
 correlation_df <- data.frame(cell_type = c("Microglia",selected_cell_type), 
@@ -594,12 +595,12 @@ p_cor <- ggplot(correlation_df,aes(x=reorder(cell_type,-correlation),
                                    y=correlation,
                                    fill=cell_type))+
   geom_bar(stat = "identity")+
-  geom_text(aes(label = round(correlation,2)),vjust = -0.25,size=5) +
+  geom_text(aes(label = round(correlation,3)),vjust = -0.25,size=5) +
   scale_fill_manual(values = c("#fc4e07",rep("#595959", 12)))+ 
   theme_cowplot(font_size = 25)+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         axis.ticks.length = unit(0.1,'cm')) +
   guides(fill = "none") +
-  scale_y_continuous(expand = c(0,0),limits = c(-0.1,0.5)) +
+  scale_y_continuous(expand = c(0,0),limits = c(0,0.5)) +
   xlab("Cell Type") +
   ylab("Spearman' correlation")
