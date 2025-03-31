@@ -180,15 +180,6 @@ DotPlot(ttt,
   scale_color_gradientn(colors = colorRampPalette(brewer.pal(11,"Spectral")[11:1])(100))+
   theme(legend.position = "top")
 ##----fig4K
-SCP::FeatureDimPlot(tmp.seu, 
-                    features = c("Pre_syn_Score1","Post_syn_Score1",
-                                 "Proteasome_Score1","Peptidase_Score1",
-                                 "Spliceosome_Score1","MGnD_Score1",
-                                 "LDAM_Score1","Splicing_Score1"),
-                    reduction = "harmonyUMAP",pt.size=0.5,ncol = 4,
-                    palcolor = sc.hic.orange(100))
-
-##----fig4L
 library(AUCell)
 library(msigdbr) 
 msigdbr(species = "Mus musculus") %>% 
@@ -202,6 +193,18 @@ GOBP_list <- msigdbr(species = "Mus musculus",
   split(x = .$gene_symbol, f = .$gs_name)
 str(GOBP_list)
 aerobic_res <- list(GOBP_list$GOBP_AEROBIC_RESPIRATION)
+
+tmp.seu <- AddModuleScore(tmp.seu,
+                          features = aerobic_res,
+                          ctrl = 100,
+                          name = "aerobic_Score")
+
+SCP::FeatureDimPlot(tmp.seu, 
+                    features = c("aerobic_Score1"),
+                    reduction = "harmonyUMAP",pt.size=0.5,ncol = 4,
+                    palcolor = sc.hic.orange(100))
+
+##----fig4L
 
 FeatureStatPlot(ttt,stat.by = c("aerobic_Score1"), 
                 palcolor = c("#ee8172","#D2EBC8","#3C77AF","#7DBFA7","#AECDE1",
