@@ -1,3 +1,10 @@
+#####################################################################################
+## Project: SCP_Microglia                                                          ##
+## Script Purpose: Comparative analysis with published scRNA-seq datasets          ##
+## Data: 2025.03.26                                                                ##
+## Author: Bijia Chen                                                              ##
+#####################################################################################
+
 # 0.Load Packages -------------------------------------------------------------------------------
 library(tidyverse)
 library(data.table)
