@@ -221,6 +221,12 @@ p <- ggplot(tmp.data.plot,
 p # save as 4*6 inches, landscape
 
 ##----fig 3G
+DefaultAssay(tmp.seu) <- "SCP"
+Idents(tmp.seu) <- "celltype"
+DEG <- FindAllMarkers(tmp.seu, logfc.threshold = 0.5, only.pos = T,min.pct = 0.3,
+                      test.use = 'wilcox') %>% 
+  mutate(pct.diff=pct.1-pct.2)
+
 palcolor <- c("#ee8172","#D2EBC8","#3C77AF","#7DBFA7","#AECDE1",
               "#EE934E","#a5917f","#F5CFE4","#634d7b",
               "#8FA4AE","#F5D2A8","#FCED82","#BBDD78")
