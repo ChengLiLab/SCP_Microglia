@@ -1,6 +1,6 @@
 #####################################################################################
 ## Project: SCP_Microglia                                                          ##
-## Script Purpose: Comparative analysis with published scRNA-seq datasets          ##
+## Script Purpose: SCP dataset analysis                                            ##
 ## Data: 2025.03.26                                                                ##
 ## Author: Bijia Chen                                                              ##
 #####################################################################################
