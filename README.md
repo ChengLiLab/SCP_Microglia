@@ -8,6 +8,7 @@ via the iProX partner repository as PXD: PXD062434.
 
 # Citation
 If you use this code or data in your research, please cite:
+
 Zhang, H., Liu Z., Chen B. et al. (2026). Single‑cell proteome atlas of aging mouse microglia reveals subpopulation‑specific phagoproteome. Neuron. DOI: [10.1016/j.neuron.2026.XX.XXX]
 
 # License
