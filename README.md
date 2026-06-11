@@ -3,6 +3,7 @@ Microglia are brain-resident immune cells with complex physiological functions. 
 
 # Data Availability
 Raw and processed mass spectrometry data have been deposited at ProteomeXchange Consortium 
+
 via the iProX partner repository as PXD: PXD062434.
 
 # Citation
