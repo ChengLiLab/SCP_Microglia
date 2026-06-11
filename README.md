@@ -6,7 +6,7 @@ Raw and processed mass spectrometry data have been deposited at ProteomeXchange 
 
 # Citation
 If you use this code or data in your research, please cite:
-Zhang, H., Liu Z., Chen B. et al. (2025). Single‑cell proteome atlas of aging mouse microglia reveals subpopulation‑specific phagoproteome. Neuron. DOI: [10.1016/j.neuron.2026.XX.XXX]
+Zhang, H., Liu Z., Chen B. et al. (2026). Single‑cell proteome atlas of aging mouse microglia reveals subpopulation‑specific phagoproteome. Neuron. DOI: [10.1016/j.neuron.2026.XX.XXX]
 # License
 This project is licensed under the MIT License – see the LICENSEfile for details.
 # Contact
